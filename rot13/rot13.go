@@ -7,9 +7,11 @@ import (
 	"os"
 )
 
-func usage(msg string) {
-	if len(msg) > 0 {
-		fmt.Printf(msg)
+func usage(msg ...string) {
+	if msg != nil {
+		for _, str := range msg {
+			fmt.Printf(str)
+		}
 	}
 
 	fmt.Printf(`
@@ -63,7 +65,7 @@ func printPathRotated(path string) {
 
 func main() {
 	if len(os.Args) < 2 {
-		usage("Wrong number of arguments!")
+		usage()
 	} else if os.Args[1] == "-" {
 		printRotated(bufio.NewReader(os.Stdin))
 	} else {
