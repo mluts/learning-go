@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/mluts/learning-go/alrm/progress_bar"
+	"github.com/mluts/learning-go/tmr/progress_bar"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -21,8 +21,9 @@ func usage() {
   Executes COMMAND after DELAY time
 
   DELAY format:
-  1 - one second
+  1s - one second
   1m - one minute
+	1.5m - 90 seconds
 `, os.Args[0])
 	os.Exit(0)
 }
@@ -124,7 +125,7 @@ func main() {
 
 	for range ticker.C {
 		str := []string{fmt.Sprintf("Duration: %s", duration)}
-		str = append(str, fmt.Sprintf("(%c - PAUSE)", pauseChar))
+		str = append(str, fmt.Sprintf("(%c - PAUSE, %c - EXIT)", pauseChar, exitChar))
 		if !pause {
 			timePassed += tickTime
 			bar.Advance(float32(tickTime))
