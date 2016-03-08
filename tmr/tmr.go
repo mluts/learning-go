@@ -23,7 +23,7 @@ func usage() {
   DELAY format:
   1s - one second
   1m - one minute
-	1.5m - 90 seconds
+  1.5m - 90 seconds
 `, os.Args[0])
 	os.Exit(0)
 }
