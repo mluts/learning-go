@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/mluts/learning-go/tmr/progress_bar"
+	"github.com/mluts/learning-go/progress_bar"
 	"os"
 	"os/exec"
 	"os/signal"
