@@ -36,7 +36,6 @@ const (
 
 var (
 	pause = false
-	exit  = false
 )
 
 func prepareTerminal() {
@@ -51,19 +50,21 @@ func restoreTerminal() {
 	restoreTerminal.Run()
 }
 
+func exit() {
+	restoreTerminal()
+	fmt.Print("\n")
+	os.Exit(0)
+}
+
 func handleInterrupts() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 	for range c {
-		restoreTerminal()
-		fmt.Print("\n")
-		os.Exit(0)
+		exit()
 	}
 }
 
 func readCommands() {
-	go handleInterrupts()
-	defer restoreTerminal()
 	prepareTerminal()
 
 	r := bufio.NewReader(os.Stdin)
@@ -74,7 +75,7 @@ func readCommands() {
 			case pauseChar:
 				pause = !pause
 			case exitChar:
-				exit = true
+				exit()
 			}
 		}
 	}
@@ -120,8 +121,8 @@ func main() {
 
 	ticker := time.NewTicker(tickTime)
 
+	go handleInterrupts()
 	go readCommands()
-	defer restoreTerminal()
 
 	for range ticker.C {
 		str := []string{fmt.Sprintf("Duration: %s", duration)}
@@ -133,7 +134,7 @@ func main() {
 		if pause {
 			str = append(str, "[paused]")
 		}
-		if exit || bar.Percent() >= 100 {
+		if bar.Percent() >= 100 {
 			ticker.Stop()
 			break
 		}
@@ -143,5 +144,5 @@ func main() {
 
 	exec.Command("/bin/sh", "-c", strings.Join(cmdArgs, " ")).Run()
 
-	fmt.Print("\n")
+	exit()
 }
