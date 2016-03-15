@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestStripComment(t *testing.T) {
 	examples := map[string]string{
@@ -103,5 +107,72 @@ func TestParseCinstruction(t *testing.T) {
 		t.Fatalf("Expected 1st token to eq %s, but have %s", "A", tokens[0].val)
 	case tokens[2].val != "D":
 		t.Fatalf("Expected 1st token to eq %s, but have %s", "D", tokens[1].val)
+	}
+}
+
+func TestParseEmptyLine(t *testing.T) {
+	if parseLine("") != nil {
+		t.Fatalf("Empty line should be parsed as nil")
+	}
+}
+
+func TestParseLines(t *testing.T) {
+	lines, symbols := parseLines(strings.NewReader("(A)\n@A\nD;JMP"))
+
+	switch {
+	case len(lines) != 2:
+		t.Fatalf("Size of lines should be 2, but have: %d", len(lines))
+	case symbols["A"] != 0:
+		t.Fatal("Symbol A should eq 0")
+	}
+
+	for k, v := range defaultSymbolTable {
+		if symbols[k] != v {
+			t.Errorf("Symbol \"%s\" should be defined as %d, have: %v", k, v, symbols[k])
+		}
+	}
+}
+
+func TestSymbolToAddr(t *testing.T) {
+	table := make(SymbolTable)
+	for k, v := range defaultSymbolTable {
+		table[k] = v
+	}
+
+	res := symbolToAddr("i", table)
+
+	if res != 16 {
+		t.Fatal("\"i\" symbol should be %d, but have %d", 16, res)
+	}
+
+	if table["i"] != 16 {
+		t.Fatal("table should contain i symbol")
+	}
+
+	res = symbolToAddr("j", table)
+
+	if res != 17 {
+		t.Fatal("\"j\" symbol should be %d, but have %d", 17, res)
+	}
+
+	if table["j"] != 17 {
+		t.Fatal("table should contain i symbol")
+	}
+}
+
+func TestIsAddr(t *testing.T) {
+	switch {
+	case !isAddr("1234"):
+		t.Error("1234 should be index")
+	case isAddr("123a4"):
+		t.Error("123a4 should not be index")
+	}
+}
+
+func TestCompileAInstruction(t *testing.T) {
+	res := compileLine([]Token{Token{T_AINST, fmt.Sprintf("%d", 0x7fff)}}, defaultSymbolTable)
+	switch {
+	case res != 0x7fff:
+		t.Errorf("@32767 should be 0111111111111111, but have: %b", res)
 	}
 }
