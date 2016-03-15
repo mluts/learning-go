@@ -69,7 +69,7 @@ func showUsage() {
 
 	%s ASSEMBLY-FILE OUTPUT-FILE
 
-	Compiles ASSEMBLY-FILE to HACK machine binary
+	Compiles HACK-ASSEMBLY to HACK machine code
 `, os.Args[0])
 	os.Exit(1)
 }
