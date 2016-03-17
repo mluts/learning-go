@@ -15,20 +15,31 @@ const (
 	A         = "@"
 	LEFT_PAR  = '('
 	RIGHT_PAR = ')'
-	A_REG     = "A"
-	D_REG     = "D"
-	M_REG     = "M"
+	A_REG     = 'A'
+	D_REG     = 'D'
+	M_REG     = 'M'
 	PLUS      = '+'
 	MINUS     = '-'
 	AND       = '&'
 	OR        = '|'
 	ONE       = '1'
 	ZERO      = '0'
-	EQ        = '='
+	NEG       = '!'
+
+	C_INST_MASK = 0xE000
+
+	ZX     = 0x800
+	NX     = 0x400
+	ZY     = 0x200
+	NY     = 0x100
+	F      = 0x80
+	NO     = 0x40
+	A_COMP = 0x1000
 
 	T_AINST = iota
-	T_OPERATOR
-	T_OPERAND
+	T_DEST
+	T_COMP
+	T_JMP
 	T_LABEL
 
 	STATE_START
@@ -99,44 +110,55 @@ func isAddr(str string) bool {
 	return true
 }
 
-func isOperand(ch rune) bool {
-	return ('A' <= ch && ch <= 'Z') || ch == '1' || ch == '0'
-}
-
-func isOperator(ch rune) bool {
-	switch ch {
-	case '-', '+', '=', ';', '&', '|':
-		return true
-	default:
-		return false
-	}
-}
-
-func contains(slice []string, str string) bool {
-	for _, s := range slice {
-		if s == str {
-			return true
-		}
-	}
-	return false
-}
-
 func parseCInstruction(line string) []Token {
 	tokens := []Token{}
-	for _, ch := range line {
-		switch {
-		case isOperand(ch):
-			tokens = append(tokens, Token{T_OPERAND, string(ch)})
-		case isOperator(ch):
-			tokens = append(tokens, Token{T_OPERATOR, string(ch)})
-		default:
-			panic(fmt.Sprintf("%c is neither operand nor operator", ch))
+	for _, str := range []string{"=", ";"} {
+		if strings.Count(line, str) > 1 {
+			panic(fmt.Sprintf("Only one \"%s\" allowed", str))
 		}
 	}
+
+	var (
+		dest, comp, jmp string
+	)
+
+	destComp := strings.Split(line, "=")
+
+	if len(destComp) > 1 {
+		dest = destComp[0]
+		comp = destComp[1]
+	} else {
+		comp = destComp[0]
+	}
+
+	compJmp := strings.Split(comp, ";")
+
+	if len(compJmp) > 1 {
+		comp = compJmp[0]
+		jmp = compJmp[1]
+	}
+
+	if dest != "" {
+		tokens = append(tokens, Token{T_DEST, dest})
+	}
+
+	if comp == "" {
+		panic("comp can't be nil!")
+	} else {
+		tokens = append(tokens, Token{T_COMP, comp})
+	}
+
+	if jmp != "" {
+		tokens = append(tokens, Token{T_JMP, jmp})
+	}
+
 	return tokens
 }
 
 func parseLine(line string) []Token {
+	line = stripComment(line)
+	line = stripWhitespace(line)
+
 	if len(line) == 0 {
 		return nil
 	}
@@ -210,8 +232,147 @@ func compileAinstruction(line []Token, symbols SymbolTable) (i uint16) {
 	return addr &^ uint16(1<<15)
 }
 
-func compileCinstruction(line []Token) uint16 {
-	return 0
+func compileDest(t Token) (mask uint16) {
+	for i, ch := range t.val {
+		switch ch {
+		case A_REG, D_REG, M_REG:
+			if i+1 < len(t.val) && strings.ContainsRune(t.val[i+1:], ch) {
+				panic(fmt.Sprintf("Duplicated dest register: %c", ch))
+			}
+			fallthrough
+		case A_REG:
+			mask |= A_DEST_MASK
+		case M_REG:
+			mask |= M_DEST_MASK
+		case D_REG:
+			mask |= D_DEST_MASK
+		default:
+			panic(fmt.Sprintf("Unknown register: %c", ch))
+		}
+	}
+
+	return
+}
+
+func compileComp1(ch rune) (mask uint16) {
+	switch ch {
+	case ZERO:
+		return ZX | ZY | F
+	case ONE:
+		return ZX | NX | ZY | NY | F | NO
+	case D_REG:
+		return ZY | NY
+	case A_REG:
+		return ZX | NY
+	case M_REG:
+		return ZX | NY | A_COMP
+	default:
+		panic(fmt.Sprintf("Unexpected comp string: \"%c\"", ch))
+	}
+}
+
+func compileComp2(operator rune, operand rune) (mask uint16) {
+	switch operand {
+	case A_REG:
+		mask |= ZX | NX
+	case M_REG:
+		mask |= ZX | NX | A_COMP
+	case D_REG:
+		mask |= ZY | NY
+	case ONE:
+		mask |= ZX | NX | ZY | F
+	default:
+		panic(fmt.Sprintf("Unknown operand: %c", operand))
+	}
+
+	switch operator {
+	case MINUS:
+		mask |= F | NO
+	case NEG:
+		mask |= NO
+	default:
+		panic(fmt.Sprintf("Unexpected operator: %c", operator))
+	}
+
+	return
+}
+
+func compileComp3(operand1 rune, operator rune, operand2 rune) (mask uint16) {
+	if operand1 == operand2 {
+		panic("Equal operands not allowed")
+	}
+
+	if (operand1 == A_REG || operand1 == M_REG) &&
+		(operand2 == A_REG || operand2 == M_REG) {
+		panic("Cant operate on A and M simultaneously")
+	}
+
+	if !(operand1 == A_REG || operand1 == M_REG || operand1 == D_REG) {
+		panic(fmt.Sprintf("Unknown register: %c", operand1))
+	}
+
+	if !(operand2 == A_REG || operand2 == M_REG || operand2 == D_REG) {
+		panic(fmt.Sprintf("Unknown register: %c", operand2))
+	}
+
+	if operand1 == M_REG || operand2 == M_REG {
+		mask |= A_COMP
+	}
+
+	if operator != MINUS {
+		if operand2 == 'D' {
+			operand1, operand2 = operand2, operand1
+		}
+	}
+
+	switch operator {
+	case OR:
+		mask |= NX | NY | NO
+	case AND:
+		switch operand1 {
+		case D_REG:
+
+		}
+	case MINUS:
+	case PLUS:
+	}
+
+	return
+}
+
+func compileComp(t Token) uint16 {
+	switch len(t.val) {
+	case 1:
+		return compileComp1(t)
+	case 2:
+		return compileComp2(t.val[0], t.val[1])
+	case 3:
+		return compileComp3(t.val[0], t.val[1], t.val[2])
+	default:
+		panic(fmt.Sprintf("Don't know how to handle comp \"%s\"", t.val))
+	}
+}
+
+func compileJmp(t Token) (mask uint16) {
+}
+
+func compileCinstruction(line []Token) (i uint16) {
+	i |= C_INST_MASK
+
+	for _, t := range line {
+		switch t.t {
+		case T_DEST:
+			i |= compileDest(t)
+		case T_COMP:
+			i |= compileComp(t)
+		case T_JMP:
+			i |= compileJmp(t)
+		default:
+			panic("Unknown token type!")
+		}
+	}
+
+	return i
 }
 
 func compileLine(line []Token, symbols SymbolTable) uint16 {

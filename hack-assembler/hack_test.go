@@ -93,25 +93,19 @@ func TestParseDestComp(t *testing.T) {
 
 	switch {
 
-	case len(tokens) != 3:
+	case len(tokens) != 2:
 		t.Fatalf("Expected 3 tokens, but have: %d", len(tokens))
 
-	case tokens[0].t != T_OPERAND:
-		t.Fatal("First token type should be a T_OPERAND")
+	case tokens[0].t != T_DEST:
+		t.Fatal("First token type should be a T_DEST")
 
 	case tokens[0].val != "A":
 		t.Fatal("First token value should be \"A\"")
 
-	case tokens[1].t != T_OPERATOR:
-		t.Fatal("Second token type should be a T_OPERATOR")
+	case tokens[1].t != T_COMP:
+		t.Fatal("Third token type should be a T_COMP")
 
-	case tokens[1].val != "=":
-		t.Fatal("Second token value should be \"=\"")
-
-	case tokens[0].t != T_OPERAND:
-		t.Fatal("Third token type should be a T_OPERAND")
-
-	case tokens[0].val != "A":
+	case tokens[1].val != "D":
 		t.Fatal("Third token value should be \"A\"")
 	}
 }
@@ -123,8 +117,8 @@ func TestParseComp(t *testing.T) {
 	case len(tokens) != 1:
 		t.Fatalf("Expected 1 token, but have: %d", len(tokens))
 
-	case tokens[0].t != T_OPERAND:
-		t.Fatal("Expected first token to be T_OPERAND")
+	case tokens[0].t != T_COMP:
+		t.Fatal("Expected first token to be T_COMP")
 
 	case tokens[0].val != "M":
 		t.Fatal("Expected first token val to be \"M\"")
@@ -135,20 +129,14 @@ func TestParseMinusComp(t *testing.T) {
 	tokens := parseLine("-M")
 
 	switch {
-	case len(tokens) != 2:
+	case len(tokens) != 1:
 		t.Fatalf("Expected 2 tokens, but have: %d", len(tokens))
 
-	case tokens[0].t != T_OPERATOR:
-		t.Fatal("Expected first token to be T_MINUS")
+	case tokens[0].t != T_COMP:
+		t.Fatal("Expected first token to be T_COMP")
 
-	case tokens[0].val != "-":
-		t.Fatal("Expected first token value to be \"-\"")
-
-	case tokens[1].t != T_OPERAND:
-		t.Fatal("Expected second token to be T_COMP")
-
-	case tokens[1].val != "M":
-		t.Fatal("Expected second token value to be \"M\"")
+	case tokens[0].val != "-M":
+		t.Fatal("Expected first token value to be \"-M\"")
 	}
 }
 
@@ -156,26 +144,14 @@ func TestParseCompPlusComp(t *testing.T) {
 	tokens := parseLine("M+A")
 
 	switch {
-	case len(tokens) != 3:
+	case len(tokens) != 1:
 		t.Fatalf("Expected 3 tokens, but have: %d", len(tokens))
 
-	case tokens[0].t != T_OPERAND:
-		t.Fatal("Expected first token to be T_OPERAND")
+	case tokens[0].t != T_COMP:
+		t.Fatal("Expected first token to be T_COMP")
 
-	case tokens[0].val != "M":
-		t.Fatal("Expected first token val to eq \"M\"")
-
-	case tokens[1].t != T_OPERATOR:
-		t.Fatal("Expected second token to be T_OPERATOR")
-
-	case tokens[1].val != "+":
-		t.Fatal("Expected second token value to eq \"+\"")
-
-	case tokens[2].t != T_OPERAND:
-		t.Fatal("Expected third token to be T_OPERAND")
-
-	case tokens[2].val != "A":
-		t.Fatal("Expected third token val to eq \"A\"")
+	case tokens[0].val != "M+A":
+		t.Fatal("Expected first token val to eq \"M+A\"")
 	}
 }
 
@@ -186,8 +162,8 @@ func TestParseOneComp(t *testing.T) {
 	case len(tokens) != 1:
 		t.Fatal("Expected to have 1 token")
 
-	case tokens[0].t != T_OPERAND:
-		t.Fatal("Expected first token to be T_OPERAND")
+	case tokens[0].t != T_COMP:
+		t.Fatal("Expected first token to be T_COMP")
 
 	case tokens[0].val != "1":
 		t.Fatal("Expected first token value to eq \"1\"")
@@ -201,11 +177,32 @@ func TestParseZeroComp(t *testing.T) {
 	case len(tokens) != 1:
 		t.Fatal("Expected to have one token")
 
-	case tokens[0].t != T_OPERAND:
-		t.Fatal("Expected first token to be T_OPERAND")
+	case tokens[0].t != T_COMP:
+		t.Fatal("Expected first token to be T_COMP")
 
 	case tokens[0].val != "0":
 		t.Fatal("Expected first token value to be \"0\"")
+	}
+}
+
+func TestParseJMP(t *testing.T) {
+	tokens := parseLine("D=0;JMP")
+
+	switch {
+	case len(tokens) != 3:
+		t.Fatal("Expected to have 3 tokens")
+	case tokens[0].t != T_DEST:
+		t.Fatal("Expected first token to be T_DEST")
+	case tokens[0].val != "D":
+		t.Fatal("Expected first token value to eq \"D\"")
+	case tokens[1].t != T_COMP:
+		t.Fatal("Expected second token to be T_COMP")
+	case tokens[1].val != "0":
+		t.Fatal("Expected second token value to eq \"0\"")
+	case tokens[2].t != T_JMP:
+		t.Fatal("Expected third token to be T_JMP")
+	case tokens[2].val != "JMP":
+		t.Fatal("Expected third token value to eq \"JMP\"")
 	}
 }
 
