@@ -319,3 +319,12 @@ func TestCompileDeqA(t *testing.T) {
 		t.Errorf("%b should eq %b", res, expected)
 	}
 }
+
+func TestCompileMinusOne(t *testing.T) {
+	res := compileLine([]Token{
+		Token{T_DEST, "M"},
+		Token{T_COMP, "-1"},
+	}, defaultSymbolTable)
+
+	var expected uint16 = C_INST_MASK | M_DEST | ZX | NX | ZY | F
+}

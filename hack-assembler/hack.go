@@ -319,7 +319,9 @@ func compileComp2(operator byte, operand byte) (mask uint16) {
 
 	switch operator {
 	case MINUS:
-		mask |= F | NO
+		if operand != ONE {
+			mask |= F | NO
+		}
 	case NEG:
 		mask |= NO
 	default:
