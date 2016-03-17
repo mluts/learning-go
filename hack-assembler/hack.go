@@ -25,16 +25,35 @@ const (
 	ONE       = '1'
 	ZERO      = '0'
 	NEG       = '!'
+	JGT       = "JGT"
+	JEQ       = "JEQ"
+	JGE       = "JGE"
+	JLT       = "JLT"
+	JNE       = "JNE"
+	JLE       = "JLE"
+	JMP       = "JMP"
 
-	C_INST_MASK = 0xE000
+	JGT_MASK = 1
+	JEQ_MASK = 2
+	JGE_MASK = 3
+	JLT_MASK = 4
+	JNE_MASK = 5
+	JLE_MASK = 6
+	JMP_MASK = 7
 
-	ZX     = 0x800
-	NX     = 0x400
-	ZY     = 0x200
-	NY     = 0x100
-	F      = 0x80
-	NO     = 0x40
-	A_COMP = 0x1000
+	C_INST_MASK = (7 << 13)
+
+	ZX     = (1 << 11)
+	NX     = (1 << 10)
+	ZY     = (1 << 9)
+	NY     = (1 << 8)
+	F      = (1 << 7)
+	NO     = (1 << 6)
+	A_COMP = (1 << 12)
+
+	A_DEST = (1 << 5)
+	D_DEST = (1 << 4)
+	M_DEST = (1 << 3)
 
 	T_AINST = iota
 	T_DEST
@@ -108,6 +127,15 @@ func isAddr(str string) bool {
 	}
 
 	return true
+}
+
+func isInList(n byte, list ...byte) bool {
+	for _, v := range list {
+		if v == n {
+			return true
+		}
+	}
+	return false
 }
 
 func parseCInstruction(line string) []Token {
@@ -188,6 +216,10 @@ func parseLines(r io.Reader) (lines [][]Token, symbols map[string]uint16) {
 	for scanner.Scan() {
 		line := parseLine(scanner.Text())
 
+		if line == nil {
+			continue
+		}
+
 		if line[0].t == T_LABEL {
 			labels = append(labels, line)
 		} else {
@@ -234,18 +266,18 @@ func compileAinstruction(line []Token, symbols SymbolTable) (i uint16) {
 
 func compileDest(t Token) (mask uint16) {
 	for i, ch := range t.val {
+		if isInList(byte(ch), A_REG, D_REG, M_REG) &&
+			strings.ContainsRune(t.val[i+1:], ch) {
+			panic(fmt.Sprintf("Duplicated dest register: %c", ch))
+		}
+
 		switch ch {
-		case A_REG, D_REG, M_REG:
-			if i+1 < len(t.val) && strings.ContainsRune(t.val[i+1:], ch) {
-				panic(fmt.Sprintf("Duplicated dest register: %c", ch))
-			}
-			fallthrough
 		case A_REG:
-			mask |= A_DEST_MASK
+			mask |= A_DEST
 		case M_REG:
-			mask |= M_DEST_MASK
+			mask |= M_DEST
 		case D_REG:
-			mask |= D_DEST_MASK
+			mask |= D_DEST
 		default:
 			panic(fmt.Sprintf("Unknown register: %c", ch))
 		}
@@ -254,7 +286,7 @@ func compileDest(t Token) (mask uint16) {
 	return
 }
 
-func compileComp1(ch rune) (mask uint16) {
+func compileComp1(ch byte) (mask uint16) {
 	switch ch {
 	case ZERO:
 		return ZX | ZY | F
@@ -263,15 +295,15 @@ func compileComp1(ch rune) (mask uint16) {
 	case D_REG:
 		return ZY | NY
 	case A_REG:
-		return ZX | NY
+		return ZX | NX
 	case M_REG:
-		return ZX | NY | A_COMP
+		return ZX | NX | A_COMP
 	default:
 		panic(fmt.Sprintf("Unexpected comp string: \"%c\"", ch))
 	}
 }
 
-func compileComp2(operator rune, operand rune) (mask uint16) {
+func compileComp2(operator byte, operand byte) (mask uint16) {
 	switch operand {
 	case A_REG:
 		mask |= ZX | NX
@@ -297,7 +329,7 @@ func compileComp2(operator rune, operand rune) (mask uint16) {
 	return
 }
 
-func compileComp3(operand1 rune, operator rune, operand2 rune) (mask uint16) {
+func compileComp3(operand1 byte, operator byte, operand2 byte) (mask uint16) {
 	if operand1 == operand2 {
 		panic("Equal operands not allowed")
 	}
@@ -307,34 +339,59 @@ func compileComp3(operand1 rune, operator rune, operand2 rune) (mask uint16) {
 		panic("Cant operate on A and M simultaneously")
 	}
 
-	if !(operand1 == A_REG || operand1 == M_REG || operand1 == D_REG) {
+	if !isInList(operand1, A_REG, M_REG, D_REG, ONE) {
 		panic(fmt.Sprintf("Unknown register: %c", operand1))
 	}
 
-	if !(operand2 == A_REG || operand2 == M_REG || operand2 == D_REG) {
+	if !isInList(operand2, A_REG, M_REG, D_REG, ONE) {
 		panic(fmt.Sprintf("Unknown register: %c", operand2))
 	}
 
-	if operand1 == M_REG || operand2 == M_REG {
+	if isInList(M_REG, operand1, operand2) {
 		mask |= A_COMP
 	}
 
-	if operator != MINUS {
-		if operand2 == 'D' {
-			operand1, operand2 = operand2, operand1
-		}
+	if !isInList(A_REG, operand1, operand2) && !isInList(M_REG, operand1, operand2) {
+		mask |= ZY | NY
+	}
+
+	if !isInList(D_REG, operand1, operand2) {
+		mask |= ZX | NX
+	}
+
+	if isInList(operator, MINUS, PLUS) {
+		mask |= F
 	}
 
 	switch operator {
 	case OR:
 		mask |= NX | NY | NO
-	case AND:
-		switch operand1 {
-		case D_REG:
 
-		}
-	case MINUS:
+	case AND:
+
 	case PLUS:
+		if operand2 == ONE {
+			mask |= NO
+
+			switch operand1 {
+			case A_REG, M_REG:
+				mask |= NY
+			case D_REG:
+				mask |= NX
+			}
+		}
+
+	case MINUS:
+		if operand2 != ONE {
+			mask |= NO
+
+			switch operand1 {
+			case A_REG, M_REG:
+				mask |= NY
+			case D_REG:
+				mask |= NX
+			}
+		}
 	}
 
 	return
@@ -343,7 +400,7 @@ func compileComp3(operand1 rune, operator rune, operand2 rune) (mask uint16) {
 func compileComp(t Token) uint16 {
 	switch len(t.val) {
 	case 1:
-		return compileComp1(t)
+		return compileComp1(t.val[0])
 	case 2:
 		return compileComp2(t.val[0], t.val[1])
 	case 3:
@@ -354,6 +411,23 @@ func compileComp(t Token) uint16 {
 }
 
 func compileJmp(t Token) (mask uint16) {
+	switch t.val {
+	case JGT:
+		mask |= JGT_MASK
+	case JEQ:
+		mask |= JEQ_MASK
+	case JGE:
+		mask |= JGE_MASK
+	case JLT:
+		mask |= JLT_MASK
+	case JNE:
+		mask |= JNE_MASK
+	case JLE:
+		mask |= JLE_MASK
+	case JMP:
+		mask |= JMP_MASK
+	}
+	return
 }
 
 func compileCinstruction(line []Token) (i uint16) {
@@ -393,6 +467,15 @@ func compile(r io.Reader) (code []uint16) {
 	return
 }
 
+func newCodeReader(code []uint16) io.Reader {
+	buf := make([]string, len(code))
+	for _, instruction := range code {
+		buf = append(buf, fmt.Sprintf("%016b\n", instruction))
+	}
+
+	return strings.NewReader(strings.Join(buf, ""))
+}
+
 func showUsage() {
 	fmt.Printf(`
 	USAGE:
@@ -425,7 +508,9 @@ func main() {
 		showUsage()
 	}
 
-	_, err = io.Copy(outputFile, inputFile)
+	code := compile(inputFile)
+
+	_, err = io.Copy(outputFile, newCodeReader(code))
 
 	if err != nil {
 		fmt.Printf("Can't copy from %s to %s: %v", output, input, err)

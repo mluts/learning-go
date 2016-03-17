@@ -272,3 +272,50 @@ func TestCompileAInstruction(t *testing.T) {
 		t.Errorf("@32767 should be 0111111111111111, but have: %b", res)
 	}
 }
+
+func TestCompileSimpleD(t *testing.T) {
+	res := compileLine([]Token{Token{T_COMP, "D"}}, defaultSymbolTable)
+
+	var expected uint16 = C_INST_MASK | ZY | NY
+
+	if res != expected {
+		t.Errorf("%b should equal %b", res, expected)
+	}
+}
+
+func TestCompileZeroJMP(t *testing.T) {
+	res := compileLine([]Token{Token{T_COMP, "0"}, Token{T_JMP, "JMP"}}, defaultSymbolTable)
+
+	var expected uint16 = C_INST_MASK | ZX | ZY | F | JMP_MASK
+
+	if res != expected {
+		t.Errorf("%b should equal %b", res, expected)
+	}
+}
+
+func TestCompileComplexCinstruction(t *testing.T) {
+	res := compileLine([]Token{
+		Token{T_DEST, "AD"},
+		Token{T_COMP, "M-D"},
+		Token{T_JMP, "JGE"},
+	}, defaultSymbolTable)
+
+	var expected uint16 = C_INST_MASK | NY | F | NO | A_COMP | JGE_MASK | A_DEST | D_DEST
+
+	if res != expected {
+		t.Errorf("%b should equal %b", res, expected)
+	}
+}
+
+func TestCompileDeqA(t *testing.T) {
+	res := compileLine([]Token{
+		Token{T_DEST, "D"},
+		Token{T_COMP, "A"},
+	}, defaultSymbolTable)
+
+	var expected uint16 = C_INST_MASK | NX | ZX | D_DEST
+
+	if res != expected {
+		t.Errorf("%b should eq %b", res, expected)
+	}
+}
