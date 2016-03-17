@@ -18,11 +18,20 @@ const (
 	A_REG     = "A"
 	D_REG     = "D"
 	M_REG     = "M"
-	T_AINST   = iota
-	T_EQ
-	T_SEMIC
-	T_ID
+	PLUS      = '+'
+	MINUS     = '-'
+	AND       = '&'
+	OR        = '|'
+	ONE       = '1'
+	ZERO      = '0'
+	EQ        = '='
+
+	T_AINST = iota
+	T_OPERATOR
+	T_OPERAND
 	T_LABEL
+
+	STATE_START
 )
 
 type SymbolTable map[string]uint16
@@ -80,6 +89,53 @@ func isLabel(line string) bool {
 	return line[0] == LEFT_PAR && line[len(line)-1] == RIGHT_PAR
 }
 
+func isAddr(str string) bool {
+	for _, ch := range str {
+		if ch > '9' || ch < '0' {
+			return false
+		}
+	}
+
+	return true
+}
+
+func isOperand(ch rune) bool {
+	return ('A' <= ch && ch <= 'Z') || ch == '1' || ch == '0'
+}
+
+func isOperator(ch rune) bool {
+	switch ch {
+	case '-', '+', '=', ';', '&', '|':
+		return true
+	default:
+		return false
+	}
+}
+
+func contains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+	return false
+}
+
+func parseCInstruction(line string) []Token {
+	tokens := []Token{}
+	for _, ch := range line {
+		switch {
+		case isOperand(ch):
+			tokens = append(tokens, Token{T_OPERAND, string(ch)})
+		case isOperator(ch):
+			tokens = append(tokens, Token{T_OPERATOR, string(ch)})
+		default:
+			panic(fmt.Sprintf("%c is neither operand nor operator", ch))
+		}
+	}
+	return tokens
+}
+
 func parseLine(line string) []Token {
 	if len(line) == 0 {
 		return nil
@@ -87,32 +143,18 @@ func parseLine(line string) []Token {
 
 	switch {
 	case isAinstruction(line):
-		return []Token{Token{T_AINST, ""}, Token{T_ID, line[1:]}}
+		return []Token{Token{T_AINST, line[1:]}}
 	case isLabel(line):
 		return []Token{Token{T_LABEL, line[1 : len(line)-1]}}
 	default:
-		tokens := make([]Token, 0)
-
-		for _, ch := range line {
-			switch {
-			case 'A' <= ch && ch <= 'Z':
-				tokens = append(tokens, Token{T_ID, string(ch)})
-			case ch == '=':
-				tokens = append(tokens, Token{T_EQ, string(ch)})
-			case ch == ';':
-				tokens = append(tokens, Token{T_SEMIC, string(ch)})
-			default:
-				return nil
-			}
-		}
-		return tokens
+		return parseCInstruction(line)
 	}
 }
 
 func parseLines(r io.Reader) (lines [][]Token, symbols map[string]uint16) {
 	scanner := bufio.NewScanner(r)
 
-	symbols = make(map[string]uint16)
+	symbols = SymbolTable{}
 
 	for k, v := range defaultSymbolTable {
 		symbols[k] = v
@@ -154,16 +196,6 @@ func symbolToAddr(symbol string, symbols SymbolTable) uint16 {
 	return symbols[symbol]
 }
 
-func isAddr(str string) bool {
-	for _, ch := range str {
-		if ch > '9' || ch < '0' {
-			return false
-		}
-	}
-
-	return true
-}
-
 func compileAinstruction(line []Token, symbols SymbolTable) (i uint16) {
 	var addr uint16
 	if isAddr(line[0].val) {
@@ -178,71 +210,11 @@ func compileAinstruction(line []Token, symbols SymbolTable) (i uint16) {
 	return addr &^ uint16(1<<15)
 }
 
-func contains(slice []string, str string) bool {
-	for _, s := range slice {
-		if s == str {
-			return true
-		}
-	}
-	return false
-}
-
-func getDestRegisters(line []Token) ([]string, int) {
-	dest := -1
-	for i, t := range line {
-		if t.t == T_EQ {
-			dest = i
-			break
-		}
-	}
-
-	if dest > 0 {
-		destRegisters = make([]string)
-		for _, t := range line[0:dest] {
-			switch t.val {
-			case A_REG, D_REG, M_REG:
-				if contains(destRegisters, t.val) {
-					panic("Duplicated A register")
-				} else {
-					destRegisters = append(destRegist)
-				}
-			default:
-				panic(fmt.Sprintf("Unknown register: %s", t.val))
-			}
-		}
-		return destRegisters, dest
-	} else {
-		return nil, 0
-	}
-}
-
-func getCompRegisters(line []Token) []string {
-	compRegisters := make([]string, 0)
-	for i, t := range line {
-		if t.val == T_SEMIC {
-			break
-		}
-
-		switch t.val {
-		case A_REG:
-			if contains(compRegisters, A_REG) {
-				panic("Double A comparison register")
-			}
-		}
-	}
-	return compRegisters
-}
-
-func compileCinstruction(line []Token) (i uint16) {
-	destRegisters, i := getDestRegisters(line)
-	if i > 0 {
-		line = line[i+1:]
-	}
-	compRegisters := getCompRegisters(line)
+func compileCinstruction(line []Token) uint16 {
 	return 0
 }
 
-func compileLine(line []Token, symbols SymbolTable) (i uint16) {
+func compileLine(line []Token, symbols SymbolTable) uint16 {
 	if line[0].t == T_AINST {
 		return compileAinstruction(line, symbols)
 	} else {
@@ -250,9 +222,15 @@ func compileLine(line []Token, symbols SymbolTable) (i uint16) {
 	}
 }
 
-// func compile(r io.Reader) string {
-// 	lines, symbols := parseLines(r)
-// }
+func compile(r io.Reader) (code []uint16) {
+	lines, symbols := parseLines(r)
+
+	for _, l := range lines {
+		code = append(code, compileLine(l, symbols))
+	}
+
+	return
+}
 
 func showUsage() {
 	fmt.Printf(`

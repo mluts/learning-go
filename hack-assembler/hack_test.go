@@ -63,17 +63,14 @@ func TestParseAinstruction(t *testing.T) {
 	tokens := parseLine("@a")
 
 	switch {
-	case len(tokens) != 2:
+	case len(tokens) != 1:
 		t.Fatalf("Wrong tokens size: %d", len(tokens))
 
 	case tokens[0].t != T_AINST:
 		t.Fatalf("Expected to have AInstruction, but have %d", tokens[0].t)
 
-	case tokens[1].t != T_ID:
-		t.Fatalf("Expected to have ID, but have %d", tokens[1].t)
-
-	case tokens[1].val != "a":
-		t.Fatalf("Second token should be \"a\"")
+	case tokens[0].val != "a":
+		t.Fatal("Expected first token value to be \"a\"")
 	}
 
 }
@@ -91,22 +88,124 @@ func TestParseLabel(t *testing.T) {
 
 }
 
-func TestParseCinstruction(t *testing.T) {
+func TestParseDestComp(t *testing.T) {
 	tokens := parseLine("A=D")
 
 	switch {
+
 	case len(tokens) != 3:
-		t.Fatalf("Expected 3 tokens, but have %d", len(tokens))
-	case tokens[0].t != T_ID:
-		t.Fatalf("Expected 1st token to be an id")
-	case tokens[1].t != T_EQ:
-		t.Fatalf("Expected 2nd token to be an equation sign")
-	case tokens[2].t != T_ID:
-		t.Fatalf("Expected 3rd token to be an id")
+		t.Fatalf("Expected 3 tokens, but have: %d", len(tokens))
+
+	case tokens[0].t != T_OPERAND:
+		t.Fatal("First token type should be a T_OPERAND")
+
 	case tokens[0].val != "A":
-		t.Fatalf("Expected 1st token to eq %s, but have %s", "A", tokens[0].val)
-	case tokens[2].val != "D":
-		t.Fatalf("Expected 1st token to eq %s, but have %s", "D", tokens[1].val)
+		t.Fatal("First token value should be \"A\"")
+
+	case tokens[1].t != T_OPERATOR:
+		t.Fatal("Second token type should be a T_OPERATOR")
+
+	case tokens[1].val != "=":
+		t.Fatal("Second token value should be \"=\"")
+
+	case tokens[0].t != T_OPERAND:
+		t.Fatal("Third token type should be a T_OPERAND")
+
+	case tokens[0].val != "A":
+		t.Fatal("Third token value should be \"A\"")
+	}
+}
+
+func TestParseComp(t *testing.T) {
+	tokens := parseLine("M")
+
+	switch {
+	case len(tokens) != 1:
+		t.Fatalf("Expected 1 token, but have: %d", len(tokens))
+
+	case tokens[0].t != T_OPERAND:
+		t.Fatal("Expected first token to be T_OPERAND")
+
+	case tokens[0].val != "M":
+		t.Fatal("Expected first token val to be \"M\"")
+	}
+}
+
+func TestParseMinusComp(t *testing.T) {
+	tokens := parseLine("-M")
+
+	switch {
+	case len(tokens) != 2:
+		t.Fatalf("Expected 2 tokens, but have: %d", len(tokens))
+
+	case tokens[0].t != T_OPERATOR:
+		t.Fatal("Expected first token to be T_MINUS")
+
+	case tokens[0].val != "-":
+		t.Fatal("Expected first token value to be \"-\"")
+
+	case tokens[1].t != T_OPERAND:
+		t.Fatal("Expected second token to be T_COMP")
+
+	case tokens[1].val != "M":
+		t.Fatal("Expected second token value to be \"M\"")
+	}
+}
+
+func TestParseCompPlusComp(t *testing.T) {
+	tokens := parseLine("M+A")
+
+	switch {
+	case len(tokens) != 3:
+		t.Fatalf("Expected 3 tokens, but have: %d", len(tokens))
+
+	case tokens[0].t != T_OPERAND:
+		t.Fatal("Expected first token to be T_OPERAND")
+
+	case tokens[0].val != "M":
+		t.Fatal("Expected first token val to eq \"M\"")
+
+	case tokens[1].t != T_OPERATOR:
+		t.Fatal("Expected second token to be T_OPERATOR")
+
+	case tokens[1].val != "+":
+		t.Fatal("Expected second token value to eq \"+\"")
+
+	case tokens[2].t != T_OPERAND:
+		t.Fatal("Expected third token to be T_OPERAND")
+
+	case tokens[2].val != "A":
+		t.Fatal("Expected third token val to eq \"A\"")
+	}
+}
+
+func TestParseOneComp(t *testing.T) {
+	tokens := parseLine("1")
+
+	switch {
+	case len(tokens) != 1:
+		t.Fatal("Expected to have 1 token")
+
+	case tokens[0].t != T_OPERAND:
+		t.Fatal("Expected first token to be T_OPERAND")
+
+	case tokens[0].val != "1":
+		t.Fatal("Expected first token value to eq \"1\"")
+	}
+}
+
+func TestParseZeroComp(t *testing.T) {
+	tokens := parseLine("0")
+
+	switch {
+	case len(tokens) != 1:
+		t.Fatal("Expected to have one token")
+
+	case tokens[0].t != T_OPERAND:
+		t.Fatal("Expected first token to be T_OPERAND")
+
+	case tokens[0].val != "0":
+		t.Fatal("Expected first token value to be \"0\"")
 	}
 }
 
@@ -117,10 +216,10 @@ func TestParseEmptyLine(t *testing.T) {
 }
 
 func TestParseLines(t *testing.T) {
-	lines, symbols := parseLines(strings.NewReader("(A)\n@A\nD;JMP"))
+	lines, symbols := parseLines(strings.NewReader("(A)\n@A\nD;JMP\nAM=D+1;JLE"))
 
 	switch {
-	case len(lines) != 2:
+	case len(lines) != 3:
 		t.Fatalf("Size of lines should be 2, but have: %d", len(lines))
 	case symbols["A"] != 0:
 		t.Fatal("Symbol A should eq 0")
