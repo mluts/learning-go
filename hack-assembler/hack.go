@@ -60,8 +60,6 @@ const (
 	T_COMP
 	T_JMP
 	T_LABEL
-
-	STATE_START
 )
 
 type SymbolTable map[string]uint16
