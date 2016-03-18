@@ -513,7 +513,7 @@ func main() {
 	_, err = io.Copy(outputFile, newCodeReader(code))
 
 	if err != nil {
-		fmt.Printf("Can't copy from %s to %s: %v", output, input, err)
+		fmt.Printf("Can't write code to file %s", output)
 		showUsage()
 	}
 }
