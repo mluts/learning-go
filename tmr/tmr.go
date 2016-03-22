@@ -29,7 +29,7 @@ func usage() {
 }
 
 const (
-	refreshTime = 500 // milliseconds
+	refreshTime = 100 // milliseconds
 	exitChar    = 'x'
 	pauseChar   = 'c'
 )
